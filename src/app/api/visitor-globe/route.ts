@@ -259,11 +259,38 @@ const responseHeaders = {
   'Cache-Control': `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
 };
 
+type GlobeData = {
+  markers: {
+    location: [number, number];
+    size: number;
+    country: string;
+    visitors: number;
+  }[];
+  totalVisitors: number;
+  totalPageviews: number;
+  totalCountries: number;
+};
+
+function createResponse(request: Request, data: GlobeData) {
+  const callback = new URL(request.url).searchParams.get('callback');
+
+  if (callback && /^[A-Za-z_$][\w$]{0,63}$/.test(callback)) {
+    return new Response(`${callback}(${JSON.stringify(data)});`, {
+      headers: {
+        ...responseHeaders,
+        'Content-Type': 'application/javascript; charset=utf-8',
+      },
+    });
+  }
+
+  return Response.json(data, { headers: responseHeaders });
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: responseHeaders });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const filters = {
       startDate: new Date(0),
@@ -302,26 +329,20 @@ export async function GET() {
       ];
     });
 
-    return Response.json(
-      {
-        markers,
-        totalVisitors: Number(stats?.visitors ?? 0),
-        totalPageviews: Number(stats?.pageviews ?? 0),
-        totalCountries: markers.length,
-      },
-      { headers: responseHeaders },
-    );
+    return createResponse(request, {
+      markers,
+      totalVisitors: Number(stats?.visitors ?? 0),
+      totalPageviews: Number(stats?.pageviews ?? 0),
+      totalCountries: markers.length,
+    });
   } catch (error) {
     console.error('visitor-globe:', error);
 
-    return Response.json(
-      {
-        markers: [],
-        totalVisitors: 0,
-        totalPageviews: 0,
-        totalCountries: 0,
-      },
-      { headers: responseHeaders },
-    );
+    return createResponse(request, {
+      markers: [],
+      totalVisitors: 0,
+      totalPageviews: 0,
+      totalCountries: 0,
+    });
   }
 }
