@@ -5,6 +5,21 @@ export const runtime = 'nodejs';
 
 const WEBSITE_ID = '19e39e2f-7017-452a-99a1-9f1091420b2c';
 const CACHE_SECONDS = 30 * 60;
+// MapMyVisitors history for senhaoc.github.io, collected from 2026-03-29 until
+// the Umami tracker replaced it. Unknown-location visits are included in the
+// pageview baseline but omitted from the map and identified-visitor count.
+const LEGACY_PAGEVIEWS = 289;
+const LEGACY_VISITORS_BY_COUNTRY: Record<string, number> = {
+  US: 127,
+  JP: 3,
+  HK: 4,
+  GB: 2,
+  PL: 1,
+  ZA: 1,
+  SG: 1,
+  CA: 1,
+  AU: 1,
+};
 const COUNTRY_COORDINATES: Record<string, [number, number]> = {
   AD: [42.5, 1.5],
   AE: [24, 54],
@@ -306,9 +321,16 @@ export async function GET(request: Request) {
       pageviews?: number | bigint;
       visitors?: number | bigint;
     };
-    const counts = (metrics as { x: string; y: number | bigint }[])
+    const currentCounts = (metrics as { x: string; y: number | bigint }[])
       .map(({ x, y }) => ({ x: x?.toUpperCase(), y: Number(y) }))
       .filter(({ x, y }) => Boolean(x) && y > 0);
+    const mergedCounts = new Map<string, number>(Object.entries(LEGACY_VISITORS_BY_COUNTRY));
+
+    currentCounts.forEach(({ x, y }) => {
+      mergedCounts.set(x, (mergedCounts.get(x) ?? 0) + y);
+    });
+
+    const counts = Array.from(mergedCounts, ([x, y]) => ({ x, y }));
     const maxCount = Math.max(...counts.map(({ y }) => y), 1);
     const markers = counts.flatMap(({ x, y }) => {
       const location = COUNTRY_COORDINATES[x];
@@ -331,8 +353,10 @@ export async function GET(request: Request) {
 
     return createResponse(request, {
       markers,
-      totalVisitors: Number(stats?.visitors ?? 0),
-      totalPageviews: Number(stats?.pageviews ?? 0),
+      totalVisitors:
+        Object.values(LEGACY_VISITORS_BY_COUNTRY).reduce((sum, value) => sum + value, 0) +
+        Number(stats?.visitors ?? 0),
+      totalPageviews: LEGACY_PAGEVIEWS + Number(stats?.pageviews ?? 0),
       totalCountries: markers.length,
     });
   } catch (error) {
