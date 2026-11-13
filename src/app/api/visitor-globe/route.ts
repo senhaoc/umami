@@ -253,9 +253,15 @@ const COUNTRY_COORDINATES: Record<string, [number, number]> = {
 };
 
 const responseHeaders = {
-  'Access-Control-Allow-Origin': 'https://senhaoc.github.io',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
   'Cache-Control': `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
 };
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: responseHeaders });
+}
 
 export async function GET() {
   try {
